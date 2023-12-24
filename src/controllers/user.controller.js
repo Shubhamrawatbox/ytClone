@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadFileCloud } from "../utils/FileUpload.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt, { decode } from "jsonwebtoken";
+import mongoose from "mongoose";
 
 // generate token
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -180,7 +181,10 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     throw new ApiErrorHandle(401, "unAuthorized Request");
   }
   try {
-    const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const decodedToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET
+    );
     const user = await User.findById(decodedToken?._id);
     if (!user) {
       throw new ApiErrorHandle(401, "Invalid Refresh Token ");
@@ -190,7 +194,9 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       throw new ApiErrorHandle(401, "Refresh Token is Expried or Used");
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user?._id);
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user?._id
+    );
 
     const options = {
       httpOnly: true,
@@ -212,4 +218,226 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-export { resgisterUser, loginUser, logOutUser,refreshAccessToken };
+// change Password
+const changePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const user = await User.findById(req.user?._id);
+  const checkPassword = await user.isPasswordCorrect(oldPassword);
+  if (!checkPassword) {
+    throw new ApiErrorHandle(400, "Invalid Password");
+  }
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Password Change Successfully", {}));
+});
+
+// currentUser
+const currentUser = asyncHandler(async (req, res) => {
+  const user = await req.user;
+  return res.status(200).json(new ApiResponse(200, "Current User", user));
+});
+
+// Update User
+const updateUser = asyncHandler(async (req, res) => {
+  const { fullname, email } = req.body;
+  if (!(fullname && email)) {
+    throw new ApiErrorHandle(400, "Required All Field");
+  }
+  const findUser = await User.findByIdAndUpdate(
+    req.user?._id,
+    { $set: { fullname, email } },
+    { new: true }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(findUser, 200, "Account Details Updated"));
+});
+
+// update Avatar
+const updateAvatar = asyncHandler(async (req, res) => {
+  const avatar = req.file?.path;
+  if (!avatar) {
+    throw new ApiErrorHandle(400, "Image is Required");
+  }
+  const fileUploadUrl = await uploadFileCloud(avatar);
+  if (!fileUploadUrl?.url) {
+    throw new ApiErrorHandle(400, "Error While Uploading");
+  }
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    { $set: { avatar: fileUploadUrl?.url } },
+    { new: true }
+  ).select("-password");
+  return res.status(200).json(new ApiResponse(user, 200, "Avatar Updated"));
+});
+
+// channel profile
+const getChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username) {
+    throw new ApiErrorHandle(400, "Username is not Empty");
+  }
+
+  const channelDetails = await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        subscriberCount: {
+          $size: "$subscribers",
+        },
+        channelsSubscribeToCount: {
+          $size: "$subscribedTo",
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullname: 1,
+        email: 1,
+        username: 1,
+        avatar: 1,
+        coverImage: 1,
+        subscriberCount: 1,
+        channelsSubscribeToCount: 1,
+        isSubscribed: 1,
+      },
+    },
+  ]);
+
+  if (!channelDetails.length) {
+    throw new ApiErrorHandle(404, "No Channel Found");
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(channelDetails, 200, "Channel Fetched Suucessfully"));
+});
+
+// watched history
+const getWatchedHistory = asyncHandler(async (req, res) => {
+  const watchHistory = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user?._id),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "_id",
+              foreignField: "owner",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullname: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        watchHistory?.[0].watchHistory,
+        200,
+        "Watch history fetched successfully"
+      )
+    );
+});
+
+//get User Playlist
+
+const getUserPlayList = asyncHandler(async (req, res) => {
+  const userPlaylist = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user?._id),
+      },
+    },
+    {
+      $lookup: {
+        from: "playLists",
+        localField: "videos",
+        foreignField: "_id",
+        as: "videos",
+      },
+    },
+    {
+      $lookup: {
+        from: "playLists",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+      },
+    },
+  ]);
+  return res
+    .status(200)
+    .json(new ApiResponse(userPlaylist[0]?.videos, 200, "Playlist fetched successfully"));
+});
+
+export {
+  resgisterUser,
+  loginUser,
+  logOutUser,
+  refreshAccessToken,
+  changePassword,
+  currentUser,
+  updateUser,
+  updateAvatar,
+  getChannelProfile,
+  getWatchedHistory,
+  getUserPlayList,
+};

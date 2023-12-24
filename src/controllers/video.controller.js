@@ -32,7 +32,6 @@ const videoPublished = asyncHandler(async (req, res) => {
   const videoFileUrl = await uploadFileCloud(videoFileLocalPath?.url);
   const thumbnailUrl = await uploadFileCloud(thumbnailLocalPath?.url);
 
-  console.log(5555, videoFileUrl);
 });
 
 export { videoPublished };
