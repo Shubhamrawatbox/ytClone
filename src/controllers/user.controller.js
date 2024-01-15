@@ -1,6 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiErrorHandle } from "../utils/ApiErrorHandle.js";
 import { User } from "../models/user.model.js";
+import { Subscription } from "../models/subscription.model.js";
 import { uploadFileCloud } from "../utils/FileUpload.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt, { decode } from "jsonwebtoken";
@@ -105,6 +106,7 @@ const loginUser = asyncHandler(async (req, res) => {
   // send response
 
   const { email, password } = req.body;
+  console.log(333,req.body)
   if ([email, password].some((field) => field?.trim() === "")) {
     throw new ApiErrorHandle(400, "Email and Password  is Required");
   }
@@ -153,8 +155,8 @@ const logOutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken: 1,
       },
     },
     {
@@ -344,7 +346,7 @@ const getChannelProfile = asyncHandler(async (req, res) => {
 
 // watched history
 const getWatchedHistory = asyncHandler(async (req, res) => {
-  const watchHistory = await User.aggregate([
+  const user = await User.aggregate([
     {
       $match: {
         _id: new mongoose.Types.ObjectId(req.user?._id),
@@ -360,8 +362,8 @@ const getWatchedHistory = asyncHandler(async (req, res) => {
           {
             $lookup: {
               from: "users",
-              localField: "_id",
-              foreignField: "owner",
+              localField: "owner",
+              foreignField: "_id",
               as: "owner",
               pipeline: [
                 {
@@ -390,7 +392,7 @@ const getWatchedHistory = asyncHandler(async (req, res) => {
     .status(200)
     .json(
       new ApiResponse(
-        watchHistory?.[0].watchHistory,
+        user?.[0].watchHistory,
         200,
         "Watch history fetched successfully"
       )
@@ -425,8 +427,75 @@ const getUserPlayList = asyncHandler(async (req, res) => {
   ]);
   return res
     .status(200)
-    .json(new ApiResponse(userPlaylist[0]?.videos, 200, "Playlist fetched successfully"));
+    .json(
+      new ApiResponse(
+        userPlaylist[0]?.videos,
+        200,
+        "Playlist fetched successfully"
+      )
+    );
 });
+
+
+// get Subscribed
+
+const subscribedChannel=asyncHandler(async(req,res)=>{
+  const {username}=req.params;
+  const user=req.user;
+  const channel=await User.findOne({username:username.toLowerCase()})
+  const isAlreadySubscribed = await Subscription.findOne({
+    subscriber: user._id
+  });
+  
+  if(!channel){
+    throw new ApiErrorHandle(404,"Channel Not Found")
+  }
+
+  if(!isAlreadySubscribed){
+    await Subscription.create({
+      subscriber:user?._id,
+      channel:channel?._id
+    })
+    
+    await Subscriber.findByIdAndUpdate(
+      user?._id,
+      { $push: { subscriber: user?._id } },
+      { new: true }
+    );
+
+
+    const updatedChannelDetails = await User.aggregate([
+      {
+        $match: {
+          username: username?.toLowerCase(),
+        },
+      },
+      {
+        $lookup: {
+          from: "subscriptions",
+          localField: "_id",
+          foreignField: "channel",
+          as: "subscribers",
+        },
+      },
+      {
+        $addFields: {
+          subscriberCount: {
+            $size: "$subscribers",
+          },
+        },
+      },
+      {
+        $project: {
+          subscriberCount: 1,
+        },
+      },
+    ]);
+    return res.status(200).json(new ApiResponse(updatedChannelDetails,200,"Subscribed Successfully"))
+  }else{
+    return res.status(400).json(new ApiResponse({},400,"Already Subscribed Successfully"))
+  }
+})
 
 export {
   resgisterUser,
@@ -440,4 +509,5 @@ export {
   getChannelProfile,
   getWatchedHistory,
   getUserPlayList,
+  subscribedChannel
 };

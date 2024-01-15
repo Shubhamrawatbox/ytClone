@@ -9,6 +9,7 @@ import {
   loginUser,
   refreshAccessToken,
   resgisterUser,
+  subscribedChannel,
   updateAvatar,
   updateUser,
 } from "../controllers/user.controller.js";
@@ -33,12 +34,13 @@ router.route("/logout").get(verifyJWT, logOutUser);
 router.route("/refreshToken").post(refreshAccessToken);
 router.route("/changePassword").post(verifyJWT, changePassword);
 router.route("/currentUser").get(verifyJWT, currentUser);
-router.route("/updateUser").post(verifyJWT, updateUser);
+router.route("/updateUser").patch(verifyJWT, updateUser);
 router
   .route("/updateAvatar")
-  .post(verifyJWT, upload.single("avatar"), updateAvatar);
+  .patch(verifyJWT, upload.single("avatar"), updateAvatar);
 router.route("/channelProfile/:username").get(verifyJWT, getChannelProfile);
 router.route("/watchHistory").get(verifyJWT, getWatchedHistory);
 router.route("/getUserPlaylist").get(verifyJWT, getUserPlayList);
+router.route('/subscribeChannel/:username').get(verifyJWT,subscribedChannel)
 
 export default router;
