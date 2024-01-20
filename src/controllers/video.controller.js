@@ -131,8 +131,6 @@ const updateVideo = asyncHandler(async (req, res) => {
 
 const deleteVideo=asyncHandler(async(req,res)=>{
   const { videoId } = req.params
-
-  console.log(555,videoId)
   if(!videoId){
     throw new ApiErrorHandle(400, "Delete Video Id is Mandatory");
   }

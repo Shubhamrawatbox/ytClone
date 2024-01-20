@@ -3,7 +3,6 @@ import {
   changePassword,
   currentUser,
   getChannelProfile,
-  getUserPlayList,
   getWatchedHistory,
   logOutUser,
   loginUser,
@@ -40,7 +39,6 @@ router
   .patch(verifyJWT, upload.single("avatar"), updateAvatar);
 router.route("/channelProfile/:username").get(verifyJWT, getChannelProfile);
 router.route("/watchHistory").get(verifyJWT, getWatchedHistory);
-router.route("/getUserPlaylist").get(verifyJWT, getUserPlayList);
 router.route('/subscribeChannel/:username').get(verifyJWT,subscribedChannel)
 
 export default router;

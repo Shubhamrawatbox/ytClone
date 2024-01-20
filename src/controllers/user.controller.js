@@ -399,42 +399,7 @@ const getWatchedHistory = asyncHandler(async (req, res) => {
     );
 });
 
-//get User Playlist
 
-const getUserPlayList = asyncHandler(async (req, res) => {
-  const userPlaylist = await User.aggregate([
-    {
-      $match: {
-        _id: new mongoose.Types.ObjectId(req.user?._id),
-      },
-    },
-    {
-      $lookup: {
-        from: "playLists",
-        localField: "videos",
-        foreignField: "_id",
-        as: "videos",
-      },
-    },
-    {
-      $lookup: {
-        from: "playLists",
-        localField: "owner",
-        foreignField: "_id",
-        as: "owner",
-      },
-    },
-  ]);
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        userPlaylist[0]?.videos,
-        200,
-        "Playlist fetched successfully"
-      )
-    );
-});
 
 
 // get Subscribed
@@ -508,6 +473,5 @@ export {
   updateAvatar,
   getChannelProfile,
   getWatchedHistory,
-  getUserPlayList,
   subscribedChannel
 };

@@ -35,6 +35,7 @@ router
     verifyJWT,
     updateVideo
   );
-router.route('/deleteVideo/:videoId').delete(verifyJWT,deleteVideo)
+router.route("/deleteVideo/:videoId").delete(verifyJWT, deleteVideo);
+
 
 export default router;
