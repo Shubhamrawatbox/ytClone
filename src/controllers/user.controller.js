@@ -6,6 +6,7 @@ import { uploadFileCloud } from "../utils/FileUpload.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt, { decode } from "jsonwebtoken";
 import mongoose from "mongoose";
+import { sendEmail } from "../utils/sendMail.js";
 
 // generate token
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -89,6 +90,8 @@ const resgisterUser = asyncHandler(async (req, res) => {
   if (!createdUser) {
     throw new ApiErrorHandle(500, "Something Went Wrong! ");
   }
+  // send Email Verification
+  const resp=await sendEmail({ email, emailType: "VERIFY", userId: createdUser?._id });
   return res
     .status(201)
     .json(new ApiResponse(createdUser, 201, "User Registered Successfully"));
@@ -106,7 +109,6 @@ const loginUser = asyncHandler(async (req, res) => {
   // send response
 
   const { email, password } = req.body;
-  console.log(333,req.body)
   if ([email, password].some((field) => field?.trim() === "")) {
     throw new ApiErrorHandle(400, "Email and Password  is Required");
   }
@@ -399,35 +401,31 @@ const getWatchedHistory = asyncHandler(async (req, res) => {
     );
 });
 
-
-
-
 // get Subscribed
 
-const subscribedChannel=asyncHandler(async(req,res)=>{
-  const {username}=req.params;
-  const user=req.user;
-  const channel=await User.findOne({username:username.toLowerCase()})
+const subscribedChannel = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  const user = req.user;
+  const channel = await User.findOne({ username: username.toLowerCase() });
   const isAlreadySubscribed = await Subscription.findOne({
-    subscriber: user._id
+    subscriber: user._id,
   });
-  
-  if(!channel){
-    throw new ApiErrorHandle(404,"Channel Not Found")
+
+  if (!channel) {
+    throw new ApiErrorHandle(404, "Channel Not Found");
   }
 
-  if(!isAlreadySubscribed){
+  if (!isAlreadySubscribed) {
     await Subscription.create({
-      subscriber:user?._id,
-      channel:channel?._id
-    })
-    
+      subscriber: user?._id,
+      channel: channel?._id,
+    });
+
     await Subscriber.findByIdAndUpdate(
       user?._id,
       { $push: { subscriber: user?._id } },
       { new: true }
     );
-
 
     const updatedChannelDetails = await User.aggregate([
       {
@@ -456,11 +454,17 @@ const subscribedChannel=asyncHandler(async(req,res)=>{
         },
       },
     ]);
-    return res.status(200).json(new ApiResponse(updatedChannelDetails,200,"Subscribed Successfully"))
-  }else{
-    return res.status(400).json(new ApiResponse({},400,"Already Subscribed Successfully"))
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(updatedChannelDetails, 200, "Subscribed Successfully")
+      );
+  } else {
+    return res
+      .status(400)
+      .json(new ApiResponse({}, 400, "Already Subscribed Successfully"));
   }
-})
+});
 
 export {
   resgisterUser,
@@ -473,5 +477,5 @@ export {
   updateAvatar,
   getChannelProfile,
   getWatchedHistory,
-  subscribedChannel
+  subscribedChannel,
 };

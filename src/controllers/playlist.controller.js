@@ -27,27 +27,35 @@ const createPlaylist = asyncHandler(async (req, res) => {
 
 //get User Playlist
 const getUserPlayLists = asyncHandler(async (req, res) => {
-  const pipeline=[]
-  pipeline.push({$match:{owner:new mongoose.Types.ObjectId(req.user?._id)}})
-  const userPlaylistData=await PlayList.aggregate(pipeline)
-  if(!userPlaylistData){
-    throw new ApiErrorHandle(400,"Playlist Not Found")
-   }
-   return res.status(200).json(new ApiResponse(userPlaylistData,200,"Playlist Fetched Successfully!"))
+  const pipeline = [];
+  pipeline.push({
+    $match: { owner: new mongoose.Types.ObjectId(req.user?._id) },
+  });
+  const userPlaylistData = await PlayList.aggregate(pipeline);
+  if (!userPlaylistData) {
+    throw new ApiErrorHandle(400, "Playlist Not Found");
+  }
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(userPlaylistData, 200, "Playlist Fetched Successfully!")
+    );
 });
 
 const getPlaylistById = asyncHandler(async (req, res) => {
-  const {playlistId} = req.params
+  const { playlistId } = req.params;
   //TODO: get playlist by id
-  if(!playlistId){
-    throw new ApiErrorHandle(400,"Playlist Id is Not Found");
+  if (!playlistId) {
+    throw new ApiErrorHandle(400, "Playlist Id is Not Found");
   }
-  const getPlaylist=await PlayList.findById(playlistId)
-  if(!getPlaylist){
-    throw new ApiErrorHandle(400,"Playlist Not Found!")
+  const getPlaylist = await PlayList.findById(playlistId);
+  if (!getPlaylist) {
+    throw new ApiErrorHandle(400, "Playlist Not Found!");
   }
-  return res.status(200).json(new ApiResponse(getPlaylist,200,"Playlist Fetched Successfully!",))
-})
+  return res
+    .status(200)
+    .json(new ApiResponse(getPlaylist, 200, "Playlist Fetched Successfully!"));
+});
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
   const { playlistId, videoId } = req.body;
@@ -56,38 +64,89 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     throw new ApiErrorHandle(400, "All Field Required");
   }
 
-   // Check if videoId already exists in the playlist
-   const playlist = await PlayList.findById(playlistId);
-   if(!playlist){
-    throw new ApiErrorHandle(404,"Playlist Not Found")
-   }
-   if (playlist.videos.includes(videoId)) {
-     throw new ApiErrorHandle(400, "Video already exists in the playlist");
-   }
+  // Check if videoId already exists in the playlist
+  const playlist = await PlayList.findById(playlistId);
+  if (!playlist) {
+    throw new ApiErrorHandle(404, "Playlist Not Found");
+  }
+  if (playlist.videos.includes(videoId)) {
+    throw new ApiErrorHandle(400, "Video already exists in the playlist");
+  }
 
-  const addedVideoToPlaylist=await PlayList.findByIdAndUpdate(
+  const addedVideoToPlaylist = await PlayList.findByIdAndUpdate(
     playlistId,
     { $push: { videos: videoId } },
     { new: true }
   );
-  if(!addedVideoToPlaylist){
+  if (!addedVideoToPlaylist) {
     throw new ApiErrorHandle(400, "Something Went Wrong!");
   }
-  return res.status(200).json(new ApiResponse(addedVideoToPlaylist,200,"Video Added To Playlist"))
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(addedVideoToPlaylist, 200, "Video Added To Playlist")
+    );
 });
 
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
-  const {playlistId, videoId} = req.body
+  const { playlistId, videoId } = req.body;
   // TODO: remove video from playlist
-  if([playlistId,videoId].some(item=>item === '')){
-    throw new ApiErrorHandle(400,"Some Field is Missing")
+  if ([playlistId, videoId].some((item) => item === "")) {
+    throw new ApiErrorHandle(400, "Some Field is Missing");
   }
-  const matchPlaylist=await PlayList.findById(playlistId)
-  const matchVideo=await matchPlaylist?.videos.findByIdAndDelete(videoId)
-  console.log(333,matchVideo)
+  const matchPlaylist = await PlayList.findById(playlistId);
+  if (!matchPlaylist) {
+    throw new ApiErrorHandle(400, "Playlist Id Not Matched");
+  }
+  const updatedVideos = matchPlaylist.videos.filter(
+    (video) => !video.equals(videoId)
+  );
+  if (!updatedVideos?.length) {
+    return res.status(200).json(new ApiResponse([], 200, "No Video Found"));
+  }
+  const updatedPlaylist = await PlayList.findByIdAndUpdate(
+    playlistId,
+    { $set: { videos: updatedVideos } },
+    { new: true }
+  );
+  if (!updatedPlaylist) {
+    throw new ApiErrorHandle(500, "Internal Server Error");
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(updatedPlaylist, 200, "Delete Video Successfully"));
+});
 
+const deletePlaylist = asyncHandler(async (req, res) => {
+  const { playlistId } = req.params;
+  // TODO: delete playlist
+  if (!mongoose.Types.ObjectId.isValid(playlistId)) {
+    throw new ApiErrorHandle(400, "Playlist Id Not Found");
+  }
+  const deletePlaylist = await PlayList.findByIdAndDelete(playlistId);
+
+  if (!deletePlaylist) {
+    throw new ApiErrorHandle(400, "Playlist Not Found!");
+  }
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, deletePlaylist, "Playlist Delete Successfully!")
+    );
+});
+
+const updatePlaylist = asyncHandler(async (req, res) => {
+  const {playlistId} = req.params
+  const {name, description} = req.body
+  //TODO: update playlist
 })
 
 
-
-export { createPlaylist,addVideoToPlaylist,getUserPlayLists,getPlaylistById,removeVideoFromPlaylist };
+export {
+  createPlaylist,
+  addVideoToPlaylist,
+  getUserPlayLists,
+  getPlaylistById,
+  removeVideoFromPlaylist,
+  deletePlaylist,
+};

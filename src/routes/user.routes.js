@@ -14,6 +14,7 @@ import {
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { verifyEmail } from "../controllers/verifyEmail.controller.js";
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.route("/register").post(
   ]),
   resgisterUser
 );
+router.route('/verifyEmail').post(verifyEmail)
 
 router.route("/login").post(loginUser);
 router.route("/logout").get(verifyJWT, logOutUser);
