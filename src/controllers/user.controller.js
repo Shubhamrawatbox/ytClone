@@ -118,6 +118,9 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!findUser) {
     throw new ApiErrorHandle(404, "User Not  Exist");
   }
+  if (!findUser?.isVerified) {
+    throw new ApiErrorHandle(400, "Please Verified First");
+  }
   const isPasswordValid = await findUser.isPasswordCorrect(password);
   if (!isPasswordValid) {
     throw new ApiErrorHandle(401, "Invalid User Credential Please Check Again");
